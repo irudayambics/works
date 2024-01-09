@@ -24,6 +24,9 @@ public class Item {
 	
 	@Column(name = "name")
 	private String name;
+	
+	@Column(name = "status")
+	private Boolean status;
 
 	/**
 	 * @return the id
@@ -51,6 +54,20 @@ public class Item {
 	 */
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	/**
+	 * @return the status
+	 */
+	public Boolean getStatus() {
+		return status;
+	}
+
+	/**
+	 * @param status the status to set
+	 */
+	public void setStatus(Boolean status) {
+		this.status = status;
 	}
 	
 }
