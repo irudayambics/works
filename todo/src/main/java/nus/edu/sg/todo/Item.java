@@ -20,6 +20,7 @@ public class Item {
 	
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(name = "id")
 	private UUID id; 
 	
 	@Column(name = "name")
