@@ -8,7 +8,7 @@ import { Todo } from './todo.model';
 })
 export class TodoService {
   BASE_URL =
-    'https://backend.victoriousriver-f80e1062.australiaeast.azurecontainerapps.io/items';
+    'https://backendpredemo.mangoforest-a38aa97f.eastasia.azurecontainerapps.io/items';
 
   constructor(private http: HttpClient) {}
 
