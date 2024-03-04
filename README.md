@@ -1,2 +1,2 @@
 # About
-Webapplication code for NUS workshop.
+Web application code for NTU workshop.

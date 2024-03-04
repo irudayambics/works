@@ -1,22 +1,18 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable, map, tap } from 'rxjs';
-import { Todo } from './todo.model';
+import { HttpClient } from "@angular/common/http";
+import { Injectable } from "@angular/core";
+import { Observable, map } from "rxjs";
+import { Todo } from "./todo.model";
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable()
 export class TodoService {
-  BASE_URL =
-    'https://backendpredemo.mangoforest-a38aa97f.eastasia.azurecontainerapps.io/items';
+  BASE_URL = "http://localhost:3000/items";
 
   constructor(private http: HttpClient) {}
 
   getTodos(): Observable<Todo[]> {
-    return this.http.get<any>(this.BASE_URL).pipe(
-      map((todos) => todos._embedded.items),
-      tap((results) => console.log(results))
-    );
+    return this.http
+      .get<any>(this.BASE_URL)
+      .pipe(map((todos) => todos._embedded.items));
   }
 
   createTodo(model: Todo): Observable<any> {

@@ -1,12 +1,19 @@
-import { enableProdMode } from '@angular/core';
-import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { Component } from "@angular/core";
+import { bootstrapApplication } from "@angular/platform-browser";
+import "zone.js";
+import { TodoComponent } from "./app/todo/todo.component";
+import { TodoService } from "./app/todo/todo.service";
+import { HttpClientModule } from "@angular/common/http";
 
-import { AppModule } from './app/app.module';
-import { environment } from './environments/environment';
-
-if (environment.production) {
-  enableProdMode();
+@Component({
+  selector: "app-root",
+  standalone: true,
+  template: `<app-todo></app-todo>`,
+  imports: [TodoComponent, HttpClientModule],
+  providers: [TodoService],
+})
+export class App {
+  name = "Angular";
 }
 
-platformBrowserDynamic().bootstrapModule(AppModule)
-  .catch(err => console.error(err));
+bootstrapApplication(App);

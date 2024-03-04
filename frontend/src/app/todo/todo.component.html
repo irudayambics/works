@@ -6,27 +6,18 @@
   id="todo-input"
   placeholder="Enter your todo..."
 />
-<button type="submit" (click)="create(inputEl.value); inputEl.value = ''">
+<button type="submit" (click)="createTodo(inputEl.value); inputEl.value = ''">
   Create
 </button>
 
 <div>
   <ul>
-    <li *ngFor="let todo of todos; index as i">
-      <div>
-        <input
-          type="checkbox"
-          name="done"
-          id="done-checkbox"
-          [checked]="todo.status"
-          (change)="updateStatus(todo, !todo.status)"
-        />
-        <span
-          [ngStyle]="{ 'text-decoration': todo.status ? 'line-through' : '' }"
-          >{{ todo.name }}</span
-        >
-      </div>
-      <button type="button" (click)="delete(todo)">X</button>
+    <li *ngFor="let todo of todos">
+      <app-todo-item
+        [todo]="todo"
+        (onUpdate)="updateTodo($event)"
+        (onDelete)="deleteTodo(todo)"
+      ></app-todo-item>
     </li>
   </ul>
 </div>
