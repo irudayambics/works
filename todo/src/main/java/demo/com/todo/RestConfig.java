@@ -1,4 +1,4 @@
-package com.demo.todo;
+package demo.com.todo;
 
 import org.springframework.data.rest.core.config.RepositoryRestConfiguration;
 import org.springframework.data.rest.webmvc.config.RepositoryRestConfigurer;
