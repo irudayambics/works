@@ -1,16 +1,16 @@
 import { Component } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 import "zone.js";
-import { TodoComponent } from "./app/todo/todo.component";
-import { TodoService } from "./app/todo/todo.service";
-import { HttpClientModule } from "@angular/common/http";
 
 @Component({
   selector: "app-root",
   standalone: true,
-  template: `<app-todo></app-todo>`,
-  imports: [TodoComponent, HttpClientModule],
-  providers: [TodoService],
+  template: `
+    <h1>Hello from {{ name }}!</h1>
+    <a target="_blank" href="https://angular.dev/overview">
+      Learn more about Angular
+    </a>
+  `,
 })
 export class App {
   name = "Angular";
