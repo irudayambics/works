@@ -8,6 +8,19 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.servers.Server;
+
+@OpenAPIDefinition(
+	info = @Info(
+        title = "OpenAPI definition",
+        version = "1.0.0"
+    ),
+    servers = {
+       @Server(url = "https://scaling-space-funicular-wg7rx6pqxw5cgrvw-8080.app.github.dev/", description = "Default Server URL")
+    }
+)
 @SpringBootApplication
 public class TodoApplication {
 
