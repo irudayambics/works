@@ -1,4 +1,4 @@
-package demo.com.todo;
+package com.demo.todo;
 
 import java.util.UUID;
 
