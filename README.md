@@ -1,2 +1,2 @@
 # About
-Web application code for NTU workshop.
+Web application code for workshop.
