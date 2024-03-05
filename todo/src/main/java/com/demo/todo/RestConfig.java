@@ -1,4 +1,4 @@
-package nus.edu.sg.todo;
+package com.demo.todo;
 
 import org.springframework.data.rest.core.config.RepositoryRestConfiguration;
 import org.springframework.data.rest.webmvc.config.RepositoryRestConfigurer;

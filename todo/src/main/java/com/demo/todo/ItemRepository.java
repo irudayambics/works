@@ -1,7 +1,4 @@
-/**
- * 
- */
-package nus.edu.sg.todo;
+package com.demo.todo;
 
 import java.util.UUID;
 
