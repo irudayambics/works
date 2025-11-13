@@ -19,6 +19,13 @@ export default defineConfig({
     baseURL,
     extraHTTPHeaders: {
       'Content-Type': 'application/json'
+    },
+    timezoneId: 'Asia/Singapore',
+    contextOptions: {
+      permissions: ['notifications']
+    },
+    launchOptions: {
+      args: ['--enable-automation', '--ignore-certificate-errors']
     }
   },
   webServer: {
@@ -29,7 +36,8 @@ export default defineConfig({
     env: {
       DATA_DB_PATH: testDbPath,
       PORT: String(PORT),
-      NODE_ENV: 'production'
+      NODE_ENV: 'production',
+      TZ: 'Asia/Singapore'
     }
   }
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -21,6 +21,20 @@ interface AuthenticationOptionsResponse {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center text-slate-400">
+          <p>Loading authentication flow…</p>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');

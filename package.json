@@ -6,8 +6,9 @@
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
-    "lint": "next lint",
-    "test:e2e": "npm run build && playwright test"
+    "lint": "eslint --max-warnings=0 .",
+    "test:e2e": "DATA_DB_PATH=./test-results/e2e-build.db npm run build && playwright test",
+    "test:unit": "tsx --test tests/unit/calendar-utils.test.ts tests/unit/timezone.test.ts"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^10.0.0",
@@ -32,6 +33,7 @@
     "eslint": "^9.5.0",
     "eslint-config-next": "16.0.0",
     "postcss": "^8.4.38",
+    "tsx": "^4.8.1",
     "typescript": "^5.5.4"
   },
   "engines": {

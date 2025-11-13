@@ -129,6 +129,7 @@ export function useNotifications() {
   useEffect(() => {
     if ('Notification' in window) {
       const perm = Notification.permission;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- initializing local state from browser API is safe here
       setPermission(perm);
 
       // Load muted state from localStorage

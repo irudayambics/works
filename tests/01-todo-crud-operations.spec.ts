@@ -1,22 +1,25 @@
 import { expect, test } from '@playwright/test';
-import { DateTime } from 'luxon';
+import { authHeaders, ensureTestSession, sgFutureIso, type TestSession } from './helpers';
 
-const SG_ZONE = 'Asia/Singapore';
+let session: TestSession;
 
-function dueAtFromNow(options: { minutes?: number; seconds?: number } = {}): string {
-  const { minutes = 0, seconds = 0 } = options;
-  return DateTime.now()
-    .setZone(SG_ZONE)
-    .plus({ minutes, seconds })
-    .toISO({ suppressMilliseconds: true, includeOffset: false })!;
-}
+test.beforeAll(async ({ request }) => {
+  session = await ensureTestSession();
+  const meResponse = await request.get('/api/auth/me', {
+    headers: authHeaders(session),
+  });
+  if (meResponse.status() !== 200) {
+    const body = await meResponse.text();
+    throw new Error(`Failed to bootstrap authenticated session: ${meResponse.status()} ${body}`);
+  }
+});
 
 test.describe('Todo CRUD API', () => {
   test('creates a todo and lists it', async ({ request }) => {
-    const dueAt = dueAtFromNow({ minutes: 5 });
+    const dueAt = sgFutureIso({ minutes: 5 });
 
     const createResponse = await request.post('/api/todos', {
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(session),
       data: {
         title: 'Playwright created todo',
         description: 'Created via E2E test',
@@ -34,7 +37,9 @@ test.describe('Todo CRUD API', () => {
     expect(created.data.id).toBeTruthy();
     expect(created.data.title).toBe('Playwright created todo');
 
-    const listResponse = await request.get('/api/todos');
+    const listResponse = await request.get('/api/todos', {
+      headers: authHeaders(session),
+    });
     expect(listResponse.status()).toBe(200);
     const listBody = (await listResponse.json()) as {
       ok: boolean;
@@ -47,10 +52,10 @@ test.describe('Todo CRUD API', () => {
   });
 
   test('rejects due dates less than a minute ahead', async ({ request }) => {
-    const dueAt = dueAtFromNow({ seconds: 30 });
+    const dueAt = sgFutureIso({ seconds: 30 });
 
     const invalidResponse = await request.post('/api/todos', {
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(session),
       data: {
         title: 'Too soon todo',
         priority: 'medium',
@@ -68,10 +73,10 @@ test.describe('Todo CRUD API', () => {
   });
 
   test('updates and deletes an existing todo', async ({ request }) => {
-    const dueAt = dueAtFromNow({ minutes: 10 });
+    const dueAt = sgFutureIso({ minutes: 10 });
 
     const createResponse = await request.post('/api/todos', {
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(session),
       data: {
         title: 'Todo to update',
         priority: 'low',
@@ -87,12 +92,12 @@ test.describe('Todo CRUD API', () => {
     const todoId = created.data.id;
 
     const patchResponse = await request.patch(`/api/todos/${todoId}`, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(session),
       data: {
         title: 'Updated title',
         completed: true,
         priority: 'medium',
-        dueAt: dueAtFromNow({ minutes: 15 }),
+        dueAt: sgFutureIso({ minutes: 15 }),
       },
     });
 
@@ -106,17 +111,23 @@ test.describe('Todo CRUD API', () => {
     expect(patched.data.completed).toBe(true);
     expect(patched.data.priority).toBe('medium');
 
-    const deleteResponse = await request.delete(`/api/todos/${todoId}`);
+    const deleteResponse = await request.delete(`/api/todos/${todoId}`, {
+      headers: authHeaders(session),
+    });
     expect(deleteResponse.status()).toBe(200);
     const deleted = await deleteResponse.json();
     expect(deleted.ok).toBeTruthy();
 
-    const secondDelete = await request.delete(`/api/todos/${todoId}`);
+    const secondDelete = await request.delete(`/api/todos/${todoId}`, {
+      headers: authHeaders(session),
+    });
     expect(secondDelete.status()).toBe(200);
     const secondDeleteBody = await secondDelete.json();
     expect(secondDeleteBody.ok).toBeTruthy();
 
-    const listResponse = await request.get('/api/todos');
+    const listResponse = await request.get('/api/todos', {
+      headers: authHeaders(session),
+    });
     const listBody = (await listResponse.json()) as { ok: boolean; data: Array<{ id: string }> };
     expect(listBody.ok).toBeTruthy();
     const exists = listBody.data.some((todo) => todo.id === todoId);
