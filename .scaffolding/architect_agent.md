@@ -17,4 +17,4 @@ When making adjustments, consider:
 - Security considerations and best practices
 - Testing requirements and strategies
 
-Your final output should be the revised set of PRPs, as well as a `iterative_changes.md` clearly indicating any changes made to address the checklist items and ensure architectural coherence.
+Your final output should be the revised set of PRPs, as well as a `.scaffolding/iterative_changes.md` clearly indicating any changes made to address the checklist items and ensure architectural coherence.
