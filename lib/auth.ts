@@ -2,10 +2,13 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
 const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-this-in-production'
+  process.env.AUTH_JWT_SECRET ?? 'development-secret-change-me'
 );
 
-export async function createSession(userId: number, username: string) {
+const cookieDomain = process.env.AUTH_COOKIE_DOMAIN;
+const cookieSecure = process.env.AUTH_COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+
+export async function createSession(userId: string, username: string) {
   const token = await new SignJWT({ userId, username })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('7d')
@@ -13,10 +16,11 @@ export async function createSession(userId: number, username: string) {
 
   (await cookies()).set('session', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure,
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: '/',
+    domain: cookieDomain || undefined,
   });
 
   return token;
@@ -28,7 +32,7 @@ export async function getSession() {
 
   try {
     const verified = await jwtVerify(token, secret);
-    return verified.payload as { userId: number; username: string };
+    return verified.payload as { userId: string; username: string };
   } catch (error) {
     return null;
   }

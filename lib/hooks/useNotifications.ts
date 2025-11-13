@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useState } from 'react';
-import { getSingaporeNow, formatSingaporeDate } from '@/lib/timezone';
+import { getSingaporeNow, formatSingaporeDate, toSg } from '@/lib/timezone';
 
 export function useNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');
@@ -71,12 +71,12 @@ export function useNotifications() {
       const todos = data.todos || [];
 
       for (const todo of todos) {
-        const dueDate = new Date(todo.due_date);
+        const dueDate = toSg(todo.due_date);
         const now = getSingaporeNow();
-        const timeDiff = dueDate.getTime() - now.getTime();
+        const timeDiff = dueDate.toMillis() - now.toMillis();
         const minutesLeft = Math.floor(timeDiff / 60000);
 
-        let body = `Due: ${formatSingaporeDate(dueDate, {})}`;
+        let body = `Due: ${formatSingaporeDate(dueDate)}`;
         if (minutesLeft > 0) {
           body = `Due in ${minutesLeft} minutes`;
         } else if (minutesLeft === 0) {
