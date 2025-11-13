@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:e2e": "playwright test"
+  "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^10.0.0",
