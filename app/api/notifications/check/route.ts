@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { err, ok } from '@/lib/http';
 import { todoDB } from '@/lib/db';
-import { nowSg, toUtcIso } from '@/lib/timezone';
+import { fromUtcIso, nowSg, toUtcIso, SG_TZ } from '@/lib/timezone';
 
 const markSchema = z.object({
   todoId: z.string().trim().min(1),
@@ -16,14 +16,21 @@ export async function GET() {
     return NextResponse.json(err('E_UNAUTHENTICATED', 'Not authenticated'), { status: 401 });
   }
 
-  const now = toUtcIso(nowSg());
+  const now = nowSg();
   const todos = todoDB.listDueForReminder(session.userId, now);
-  const payload = todos.map((todo) => ({
-    id: todo.id,
-    title: todo.title,
-    dueAt: todo.dueAt,
-    reminderMinutes: todo.reminderMinutes,
-  }));
+  const payload = todos.map((todo) => {
+    const dueAt = todo.dueAt ? fromUtcIso(todo.dueAt).setZone(SG_TZ) : null;
+    const reminderMinutes = todo.reminderMinutes ?? 0;
+    const reminderAt = dueAt ? dueAt.minus({ minutes: reminderMinutes }) : null;
+
+    return {
+      id: todo.id,
+      title: todo.title,
+      dueAt: todo.dueAt,
+      reminderMinutes: todo.reminderMinutes,
+      remindAt: reminderAt ? toUtcIso(reminderAt) : null,
+    };
+  });
 
   return NextResponse.json(ok({ todos: payload }));
 }

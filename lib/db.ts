@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DateTime } from 'luxon';
+
+import { fromUtcIso, SG_TZ } from './timezone';
 
 const dbPath = process.env.DATA_DB_PATH ?? path.resolve(process.cwd(), 'todos.db');
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -404,9 +407,8 @@ export const todoDB = {
       LIMIT ? OFFSET ?
     `;
 
-    const rows = db
-      .prepare<any>(sql)
-      .all(...bindings, limit, offset);
+    const queryArgs = [...bindings, limit, offset];
+    const rows = (db.prepare<any>(sql) as any).all(...bindings, limit, offset);
 
     return rows.map((row: any) => ({
       ...hydrateTodo(row),
@@ -486,25 +488,46 @@ export const todoDB = {
     db.prepare('DELETE FROM todos WHERE userId = ? AND completed = 1 AND updatedAt < ?').run(userId, iso);
   },
 
-  listDueForReminder(userId: string, nowIso: string): Array<TodoWithRelations> {
-    const stmt = db.prepare<[string, string], any>(
+  listDueForReminder(userId: string, now: DateTime): Array<TodoWithRelations> {
+    const stmt = db.prepare<[string], any>(
       `SELECT * FROM todos
          WHERE deletedAt IS NULL
            AND reminderMinutes IS NOT NULL
            AND dueAt IS NOT NULL
            AND completed = 0
-           AND userId = ?
-           AND datetime(dueAt) <= datetime(?)
-           AND (lastNotificationSent IS NULL OR datetime(lastNotificationSent) < datetime(dueAt))`
+           AND userId = ?`
     );
 
-    const rows = stmt.all(userId, nowIso);
+    const rows = stmt.all(userId);
+    const nowSg = now.setZone(SG_TZ);
 
-    return rows.map((row: any) => ({
-      ...hydrateTodo(row),
-      subtasks: subtaskDB.listForTodo(row.id),
-      tags: tagDB.listByTodo(row.id),
-    }));
+    return rows
+      .map((row: any) => ({
+        ...hydrateTodo(row),
+        subtasks: subtaskDB.listForTodo(row.id),
+        tags: tagDB.listByTodo(row.id),
+      }))
+      .filter((todo) => {
+        if (!todo.dueAt || todo.reminderMinutes == null) {
+          return false;
+        }
+
+        const dueAt = fromUtcIso(todo.dueAt).setZone(SG_TZ);
+        const reminderAt = dueAt.minus({ minutes: todo.reminderMinutes });
+
+        if (reminderAt > nowSg) {
+          return false;
+        }
+
+        if (todo.lastNotificationSent) {
+          const lastSent = fromUtcIso(todo.lastNotificationSent).setZone(SG_TZ);
+          if (lastSent >= reminderAt) {
+            return false;
+          }
+        }
+
+        return true;
+      });
   },
 
   markNotified(id: string, sentAt: string): void {

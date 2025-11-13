@@ -1,12 +1,19 @@
 'use client';
 
 import { useEffect, useCallback, useState } from 'react';
-import { getSingaporeNow, formatSingaporeDate, toSg } from '@/lib/timezone';
+
+import { formatSingaporeDate, getSingaporeNow, toSg } from '@/lib/timezone';
 
 export function useNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isMuted, setIsMuted] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
+  const pollSecondsRaw = Number.parseInt(
+    process.env.NEXT_PUBLIC_NOTIFICATIONS_POLL_INTERVAL_SECONDS ?? '30',
+    10
+  );
+  const pollSeconds = Number.isFinite(pollSecondsRaw) && pollSecondsRaw > 0 ? pollSecondsRaw : 30;
+  const pollIntervalMs = Math.max(10, pollSeconds) * 1000;
 
   // Toggle mute state
   const toggleMute = useCallback(() => {
@@ -67,21 +74,29 @@ export function useNotifications() {
       const response = await fetch('/api/notifications/check');
       if (!response.ok) return;
 
-      const data = await response.json();
-      const todos = data.todos || [];
+      const json = await response.json();
+      if (!json.ok) return;
+
+      const todos = (json.data?.todos ?? []) as Array<{
+        id: string;
+        title: string;
+        dueAt: string | null;
+        reminderMinutes: number | null;
+        remindAt: string | null;
+      }>;
 
       for (const todo of todos) {
-        const dueDate = toSg(todo.due_date);
+        if (!todo.dueAt) continue;
+
+        const dueDate = toSg(todo.dueAt);
         const now = getSingaporeNow();
-        const timeDiff = dueDate.toMillis() - now.toMillis();
-        const minutesLeft = Math.floor(timeDiff / 60000);
+        const remindAt = todo.remindAt ? toSg(todo.remindAt) : dueDate;
+        const diff = dueDate.toMillis() - now.toMillis();
+        const minutesLeft = Math.floor(diff / 60000);
 
         let body = `Due: ${formatSingaporeDate(dueDate)}`;
-        if (minutesLeft > 0) {
-          body = `Due in ${minutesLeft} minutes`;
-        } else if (minutesLeft === 0) {
-          body = 'Due now!';
-        }
+        if (minutesLeft > 0) body = `Due in ${minutesLeft} minutes`;
+        if (minutesLeft === 0) body = 'Due now!';
 
         const notification = showNotification(`📋 ${todo.title}`, {
           body,
@@ -134,10 +149,10 @@ export function useNotifications() {
     checkNotifications();
 
     // Then check every minute
-    const interval = setInterval(checkNotifications, 60000);
+    const interval = setInterval(checkNotifications, pollIntervalMs);
 
     return () => clearInterval(interval);
-  }, [isEnabled, checkNotifications]);
+  }, [isEnabled, checkNotifications, pollIntervalMs]);
 
   return {
     permission,

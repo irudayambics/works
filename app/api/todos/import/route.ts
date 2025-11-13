@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DateTime } from 'luxon';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { err, ok } from '@/lib/http';
 import { createId } from '@/lib/id';
 import { tagDB, todoDB, todoTagDB, subtaskDB } from '@/lib/db';
-import { nowSg, toUtcIso } from '@/lib/timezone';
+import { nowSg, parseSg, toUtcIso, SG_TZ } from '@/lib/timezone';
 
 const tagSchema = z.object({
   name: z.string().trim().min(1).max(50),
@@ -51,12 +52,13 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const timestamp = toUtcIso(nowSg());
-  const existingTags = new Map(tagDB.list(session.userId).map((tag) => [tag.name.toLowerCase(), tag.id]));
-  const tagColorMap = new Map<string, string>();
+  const now = nowSg();
+  const timestamp = toUtcIso(now);
+  const existingTags = new Map(
+    tagDB.list(session.userId).map((tag) => [tag.name.toLowerCase(), tag.id])
+  );
 
   parsed.data.tags.forEach((tag) => {
-    tagColorMap.set(tag.name.toLowerCase(), tag.color.toLowerCase());
     if (!existingTags.has(tag.name.toLowerCase())) {
       const created = tagDB.create({
         id: createId(),
@@ -73,18 +75,30 @@ export async function POST(request: NextRequest) {
   let importedCount = 0;
   parsed.data.todos.forEach((todo) => {
     const todoId = createId();
-    const dueAtIso = todo.dueAt ? new Date(todo.dueAt).toISOString() : null;
+
+    let dueAtIso: string | null = null;
+    if (todo.dueAt) {
+      const isoCandidate = DateTime.fromISO(todo.dueAt, { setZone: true });
+      const normalized = isoCandidate.isValid ? isoCandidate.setZone(SG_TZ) : parseSg(todo.dueAt);
+      if (normalized.isValid) {
+        dueAtIso = toUtcIso(normalized);
+      }
+    }
+
+    const isRecurring = todo.isRecurring ?? false;
+    const reminderMinutes = dueAtIso ? todo.reminderMinutes ?? null : null;
+
     todoDB.create({
       id: todoId,
       userId: session.userId,
       title: todo.title,
-      description: todo.description ?? null,
+      description: todo.description?.trim?.() ? todo.description.trim() : null,
       priority: todo.priority,
       dueAt: dueAtIso,
       completed: todo.completed ? 1 : 0,
-      isRecurring: todo.isRecurring ? 1 : 0,
-      recurrencePattern: todo.recurrencePattern ?? null,
-      reminderMinutes: todo.reminderMinutes ?? null,
+      isRecurring: isRecurring ? 1 : 0,
+      recurrencePattern: isRecurring ? todo.recurrencePattern ?? null : null,
+      reminderMinutes,
       lastNotificationSent: null,
       createdAt: timestamp,
       updatedAt: timestamp,
