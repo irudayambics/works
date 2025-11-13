@@ -89,21 +89,19 @@ All endpoints reuse `app/api/todos` routes and envelopes defined in `00-core-prp
 ### Timezone Handling
 Priorities themselves are timezone-agnostic, but due date calculations triggered during sorting MUST continue to use `nowSg`, `toSg`, and `toUtcIso` helpers from `00-core-prp.md`. When comparing due dates while sorting, convert to Singapore time before computing relative ordering to handle cross-midnight edge cases.
 
-### Client-Side Behavior
-**Priority Selector**
-- UI uses accessible segmented control with keyboard navigation and ARIA labels.
-- State defaults to `Medium`; selection updates form state and triggers optimistic reorder on submit.
-- API errors highlight control and show helper text.
+## UI Components
+- **PrioritySelector** renders an accessible segmented control (or select on mobile) defaulting to `medium`, highlighting API validation errors inline and triggering optimistic reorders.
+- **PriorityBadge** maps priorities to Tailwind tokens (`bg-red-500`, `bg-amber-500`, `bg-slate-500`) and updates immediately after optimistic mutations with reconciliation to server responses.
+- **PriorityFilterChips** sync with URL search params, expose clear-all actions, and handle pagination cursors derived from the active priority.
+- **PrioritySummaryCounters** (paired with `/summary`) display count badges for each level and revalidate via SWR after mutations.
+- **ErrorBanner / Toast** components surface validation, conflict, or rate-limit messaging without disrupting list focus per project guidelines.
 
-**Priority Badges**
-- UI maps priority to Tailwind color tokens: High→`bg-red-500`, Medium→`bg-amber-500`, Low→`bg-slate-500` (final shades per design system).
-- State ensures badges update immediately after optimistic mutation.
-- API responses reconcile final priority; on mismatch, re-sort list and display subtle toast.
-
-**Priority Filtering UI**
-- Filter controls update URL search params for deep linking.
-- State uses SWR key derived from priority and pagination; refetch triggered on change.
-- API errors show inline banner and keep previous data while retrying.
+## Edge Cases
+- Submitting invalid priority values (e.g., uppercase "High") must return `E_VALIDATION`; UI lowercases input or prompts correction.
+- Switching filters while paginated requires cursor invalidation to avoid cross-priority leakage; mismatched cursors trigger `E_VALIDATION` and a clean refetch.
+- Updating a priority on a soft-deleted todo returns `E_NOT_FOUND`; clients remove the todo from view and notify the user.
+- Hitting the `/summary` endpoint before any todos exist should return zeros rather than 404 to keep badges stable.
+- Rapid toggling of priorities can hit rate limits; UI should debounce updates and surface cooldown messaging when receiving `E_RATE_LIMIT`.
 
 ## Acceptance Criteria
 

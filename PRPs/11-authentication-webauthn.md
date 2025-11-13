@@ -279,36 +279,20 @@ if (lastUsedDelta.as('days') > 90) {
 - Persist session expiry and credential usage timestamps in UTC, but compute grace periods with SG helpers.
 - JWT `exp` claims MUST use Unix timestamps derived from SG-based DateTime converted to UTC.
 
-### Client-Side Behavior
+## UI Components
+- **AuthLanding** detects passkey support, shows fallback messaging when unsupported, and manages email input submission to `/register/options` or `/login/options`.
+- **PasskeyRegistrationForm** disables submit during pending state, invokes WebAuthn APIs with cached `challengeId`, and updates global auth context after verification.
+- **PasskeyLoginButton** supports conditional UI auto-prompting, fallback manual invocation, and redirects upon successful assertion verification.
+- **SessionStatusManager** schedules SG-aware refreshes two minutes before expiry, handles `E_UNAUTHORIZED`, and clears caches on logout.
+- **CredentialManagementTable** lists registered devices with revoke actions, optimistic row removal, and SG-formatted `lastUsedAt` timestamps.
+- **ErrorBanner / Toast** communicates validation, forbidden, or conflict responses in line with `.github/copilot-instructions.md` tone.
 
-#### Auth Landing
-
-- UI detects `window.PublicKeyCredential` support; shows fallback instructions when unsupported.
-- State stores email input and handles submission to `/register/options` or `/login/options` before invoking WebAuthn APIs.
-- API failures display inline error banners and focus problematic fields.
-
-#### Registration Flow
-
-- UI disables the CTA during network calls and shows a spinner while waiting for biometric prompt.
-- State caches `challengeId`; on attestation success, call verify endpoint and update the global auth store.
-- API errors route to friendly copy (e.g., duplicate device) with a retry option.
-
-#### Login Flow
-
-- UI offers a "Use another device" path that surfaces QR-based passkey (future), but default uses platform authenticator.
-- State handles silent autofill (Conditional UI) when the browser supports it; otherwise the user clicks manually.
-- API success hydrates user context (SWR mutate) and redirects to the dashboard.
-
-#### Session Management
-
-- Client schedules refresh calls two minutes before access token expiry using SG-aware timers.
-- On `E_UNAUTHORIZED`, UI clears auth state, deletes caches, and redirects to login with a toast "Session expired".
-
-#### Credential Management UI
-
-- Accessible table lists devices with delete buttons; deleting shows a confirm dialog.
-- Optimistically remove the row, rollback if the API fails.
-- Display last used timestamp converted via `toSg` and formatted relative to SG time.
+## Edge Cases
+- Browsers without WebAuthn support must fall back to instructions without attempting credential APIs.
+- Expired or mismatched `challengeId` values should return `E_VALIDATION`; UI prompts the user to retry the flow from the start.
+- Counter regressions detected during login trigger `E_CONFLICT`; client notifies the user to re-register the affected credential.
+- Revoking a credential currently in use must invalidate active sessions and force re-authentication; UI surfaces that the device was removed.
+- Rate limits on options/verify endpoints return `E_RATE_LIMIT`; UI shows cooldown timers and prevents repeated submissions.
 
 ## Acceptance Criteria
 

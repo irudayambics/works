@@ -123,7 +123,12 @@ Updates template metadata.
 Soft deletes a template.
 
 - Input: path `id`.
-### Timezone Handling
+- Output: `ok({ id: string })` after marking the template `deletedAt` and removing associated cached summaries.
+- Validation:
+  - Missing or already-deleted templates return idempotent success.
+  - Templates belonging to another user return `E_FORBIDDEN`.
+  - Active instantiations referencing the template should continue working; no hard delete allowed.
+
 ### Timezone Handling
 
 **Critical:** All date operations use Singapore timezone (`Asia/Singapore`). Template due date offsets must convert through the shared helpers so instantiated todos align with SG expectations.
@@ -141,13 +146,20 @@ const dueAt = template.dueOffsetMinutes != null
   : null;
 ```
 
-### Client-Side Behavior
+## UI Components
+- **TemplateGallery** displays category-grouped cards with skeletons, empty states, and error banners, persisting the last viewed category in query params/local storage.
+- **TemplateFormDialog** pre-fills from an existing todo, previews serialized subtasks, blocks submission while validation runs, and shows inline errors.
+- **TemplateInstantiateDrawer** lets users choose target date and overrides, triggers optimistic todo creation, and rolls back on failure with contextual toasts.
+- **TemplateCategoryFilter** offers pill-based filters and search, syncing state to the URL for shareable views.
+- **SubtaskOrderEditor** mirrors the Subtasks PRP drag/keyboard interactions to maintain contiguous positions before serialization.
+- **FeedbackToast / InlineError** surfaces validation, conflict, or forbidden responses using consistent design language.
 
-- Template gallery shows grouped cards by category with skeleton, empty, and error states.
-- Template editor uses JSON preview for subtasks to highlight serialization issues and disables submit while validation runs.
-- Instantiating a template triggers optimistic todo creation; on failure, UI rolls back and surfaces a toast with retry.
-- Category filter persists in query string/local storage so the gallery reopens in the last viewed category.
-- Subtasks ordering UI mirrors the Subtasks PRP drag controls and writes positions before submission.
+## Edge Cases
+- Saving templates with duplicate names (case-insensitive) must return `E_CONFLICT`; UI prompts the user to adjust the name while preserving form state.
+- Serializing more than 50 subtasks or providing non-contiguous positions should fail validation; the editor highlights offending entries.
+- Instantiating a template whose tags were deleted must return `E_NOT_FOUND`; clients refresh tag data and present corrective messaging.
+- Due date offsets producing past times relative to SG `now` should trigger `E_VALIDATION`, guiding users to adjust offsets or target dates.
+- Instantiating a soft-deleted template should yield `E_NOT_FOUND`; gallery must refresh and remove the card while notifying the user.
 
 ## Acceptance Criteria
 

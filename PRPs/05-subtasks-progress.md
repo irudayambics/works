@@ -173,20 +173,19 @@ db.prepare(
 });
 ```
 
-### Client-Side Behavior
+## UI Components
+- **SubtaskChecklist** renders skeletons, empty states, and checklist items with collapse/expand behavior for completed subtasks stored in local preferences.
+- **SubtaskComposer** provides an inline input with validation, prevents duplicate submissions during pending states, and reconciles temporary IDs with API responses.
+- **SubtaskReorderList** supports drag-and-drop and accessible keyboard reordering, optimistically applying new positions before syncing via the reorder endpoint.
+- **ProgressMeter** displays completion percentages in todo detail panels and updates parent list chips after successful toggles.
+- **ErrorToast / InlineFieldErrors** communicate validation failures, concurrency conflicts, and cascade deletions while preserving user context.
 
-- Checklist rendering:
-  - UI shows a skeleton list while fetching subtasks and swaps to content with empty/error states per design system.
-  - Completed subtasks optionally collapse behind a toggle that persists in local storage.
-- Subtask creation form:
-  - Input trims whitespace and disables submit until valid; duplicate submissions are prevented via pending state.
-  - Optimistic updates append the new subtask with a temporary ID reconciled against the response.
-- Reorder interactions:
-  - Drag-and-drop uses pointer-safe handles and keyboard accessible move controls.
-  - Client sends a single reorder payload after the user commits changes; optimistic UI updates roll back on error.
-- Progress indicator:
-  - Todo detail panel shows a progress bar with percentage derived from completed/total subtasks.
-  - Parent todo list chips reflect progress without waiting for a page reload by updating shared state.
+## Edge Cases
+- Creating more than 200 subtasks per todo should return `E_CONFLICT`; UI needs to cap input and explain the limit.
+- Reorder payloads missing a subtask or containing duplicates must trigger `E_VALIDATION`; client should refresh data when server rejects the change.
+- Toggling completion on a deleted subtask should return `E_NOT_FOUND`; UI refreshes the checklist and notifies the user.
+- Cascaded deletes from parent todo removal must soft-delete subtasks within the same transaction to avoid orphaned items.
+- Race conditions from simultaneous edits should surface conflict messaging and re-fetch the latest checklist to avoid divergent progress percentages.
 
 ## Acceptance Criteria
 

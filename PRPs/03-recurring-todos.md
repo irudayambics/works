@@ -173,26 +173,20 @@ const dueAtUtc = toUtcIso(nextOccurrence);
 - Persist all generated occurrences with `dueAt` in UTC; UI converts back via `toSg`.
 - When computing monthly/yearly rollovers, rely on Luxon’s `plus` with SG zone to avoid DST assumptions.
 
-### Client-Side Behavior
-**Recurrence Editor Modal**
-- UI displays frequency selection, interval input, weekday multi-select, start/end date pickers.
-- State validates client-side (e.g., ensure weekday selection when weekly) before hitting API.
-- API errors show inline field feedback; modal prevents closing on failure unless user cancels intentionally.
+## UI Components
+- **RecurrenceEditorModal** provides frequency, interval, weekday, and date inputs with inline validation feedback and prevents accidental closure during pending mutations.
+- **RecurrenceBadge** surfaces readable summaries ("Repeats every 2 weeks…"), updates after mutations, and toggles "Ended" styling when the rule is terminated.
+- **OccurrenceList** renders upcoming occurrences with completion toggles, optimistic spinners, and lazy loading against `/api/recurrences/:id` when expanded.
+- **SkipOccurrenceDialog** confirms skip actions, handles optimistic removal, and reinstates the occurrence if the server returns an error.
+- **EndRecurrencePopover** offers immediate or scheduled end options, refreshing cached data once the rule updates.
+- **ErrorBanner / Toast** components communicate validation (`E_VALIDATION`), conflict (`E_CONFLICT`), or internal errors while preserving context.
 
-**Recurrence Badge and Summary**
-- UI displays readable summary (e.g., "Repeats every 2 weeks on Tue, Thu") generated using shared formatter.
-- State keeps recurrence info in todo object; SWR caches rule details keyed by `recurrenceRuleId`.
-- API updates re-fetch rule and upcoming occurrences upon success.
-
-**Occurrence Lifecycle**
-- Completing occurrence triggers optimistic complete and background creation of next instance; UI shows spinner on series header while waiting.
-- Skipping uses confirmation dialog; on success, UI inserts new occurrence card with fade animation.
-- Ending recurrence updates badge to "Ended" state and removes future scheduled occurrences list.
-
-**Upcoming Occurrences List (Optional UI)**
-- UI may show table of next N occurrences for transparency.
-- State fetches via `/api/recurrences/:id` preview data.
-- API errors display inline alert; fallback message encourages retry.
+## Edge Cases
+- Attempting to create a recurrence with a start date within one minute of `nowSg()` returns `E_VALIDATION`; modal must keep user input intact.
+- Weekly recurrences submitted without weekdays trigger `E_VALIDATION`; UI enforces at least one selection before calling the API.
+- Monthly rules anchored on the 31st require `monthlyStrategy` to avoid invalid dates; engine must apply roll-forward logic for shorter months.
+- Updating `endAt` to a value before the last generated occurrence should return `E_CONFLICT`, prompting the user to complete or skip outstanding instances.
+- Skipping or completing an occurrence not linked to the rule returns `E_NOT_FOUND`; client should refresh occurrence lists and show a warning toast.
 
 ## Acceptance Criteria
 

@@ -267,24 +267,19 @@ const scheduledAtUtc = toUtcIso(scheduledAtSg);
 const scheduledAtLabel = toSg(scheduledAtUtc).toFormat('dd MMM yyyy, HH:mm');
 ```
 
-### Client-Side Behavior
+## UI Components
+- **NotificationPermissionBanner** displays callouts when `Notification.permission !== 'granted'`, persists dismissal after successful preference updates, and shows inline validation errors.
+- **ReminderSettingsPanel** offers lead-time selects and enable toggles with optimistic updates guarded by `Idempotency-Key` headers.
+- **TodoReminderToggle** attaches to each todo detail view, exposing lead-time overrides, handling `E_CONFLICT` gracefully, and reconciling state after refresh.
+- **ReminderActivityList** paginates recent reminders with SG-formatted timestamps, skeleton placeholders, and cursor-based "Load more" controls.
+- **DispatchStatusToast** surfaces feedback when the polling worker triggers reminder deliveries or hits errors/rate limits.
 
-- Notification permission banner:
-  - UI surfaces a dismissible callout when `Notification.permission` is not `granted`.
-  - State persists banner dismissal only after successful `PUT /api/reminder-preferences`.
-  - API errors show inline helper text and keep the banner visible.
-- Reminder settings panel:
-  - UI presents a select control for default lead time and a toggle for enablement.
-  - State updates optimistically; on failure, rolls back to previous values and displays a toast.
-  - API calls include `Idempotency-Key` generated per mutation to avoid duplicate writes.
-- Todo reminder toggle:
-  - UI lists per-todo reminder status with quick actions to adjust lead time.
-  - State snapshots server response to ensure duplicate prevention; on `E_CONFLICT`, it refreshes the reminder list.
-  - API failures highlight the control and provide retry affordances.
-- Reminder activity list:
-  - UI renders the latest 20 reminders with SG-formatted timestamps and status badges.
-  - State streams updates from dispatch responses and exposes empty/loading/error states that satisfy core UI conventions.
-  - API pagination fetches older entries on demand using cursors.
+## Edge Cases
+- Permission denied (`Notification.permission === 'denied'`) should keep the banner visible with guidance and avoid repeated permission prompts.
+- Scheduling reminders for todos due within one minute must return `E_VALIDATION`; the UI keeps control state and highlights the lead-time field.
+- Duplicate schedules for the same `(todoId, leadMinutes)` return `E_CONFLICT`; clients refresh the reminder list instead of retrying endlessly.
+- Concurrent polling across multiple tabs must not duplicate notifications; dispatch endpoint and client dedupe logic should handle this gracefully.
+- Timezone conversions around SG midnight must ensure `scheduledAt` never falls in the past after conversion; clients surface any validation failure clearly.
 
 ## Acceptance Criteria
 

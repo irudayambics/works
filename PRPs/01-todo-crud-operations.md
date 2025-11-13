@@ -171,27 +171,19 @@ if (dueDateSg && dueDateSg <= now.plus({ minutes: 1 })) {
 const dueAtUtc = dueDateSg ? toUtcIso(dueDateSg) : null;
 ```
 
-### Client-Side Behavior
-**Todo Creation Form**
-- UI disables submit until title valid; shows inline errors from API.
-- State optimistically inserts todo into list; rollback on error.
-- API calls include `Idempotency-Key` header for retries.
+## UI Components
+- **TodoCreateForm** renders title, description, priority, and due date inputs with inline helper text. Disabled states cover invalid data or pending submission, and the component adds an `Idempotency-Key` header on every POST while optimistically inserting the placeholder todo.
+- **TodoListView** shows skeleton rows, empty illustrations, or the sorted todo list. It integrates completion toggles and filter controls while keeping SWR-style caches fresh after mutations.
+- **TodoDetailDrawer** pre-fills editable fields, displays optimistic saving indicators, and rolls back field changes when the PATCH call fails. It only sends diffed fields to the API.
+- **DeleteConfirmationModal** guards destructive actions with SG-friendly copy, offers undo, and triggers cascaded soft deletes so dependent resources (subtasks, tags, reminders, recurrence instances) stay in sync.
+- **ToastBanner / ErrorAlert** components surface validation and server errors using the shared design language from `.github/copilot-instructions.md`.
 
-**Todo List Rendering**
-- UI shows skeleton loading state, empty illustration, and error retry CTA.
-- State cached using SWR-style stale-while-revalidate; invalidate on mutations.
-- Supports filtering by completion toggle and search integration later.
-
-**Todo Editing Drawer**
-- UI pre-populates form; saving shows inline progress indicator.
-- State updates selected item and list simultaneously; on failure, revert and toast error.
-- API patch only sends changed fields.
-
-**Todo Deletion**
-- UI confirmation modal prevents accidental deletes; undo button triggers refetch.
-- State removes todo immediately while awaiting server confirmation.
-- API delete considered idempotent; undo (restore) deferred to future PRP.
-- Delete handler MUST cascade within the same transaction to dependent resources introduced by other features (subtasks, tags, reminders, recurrence instances) by soft-deleting their rows so acceptance criteria in later PRPs stay satisfied.
+## Edge Cases
+- Due dates within one minute of `nowSg()` return `E_VALIDATION`; UI must surface friendly copy and keep user input intact.
+- Duplicate submissions caused by network retries rely on `Idempotency-Key`; server returns `E_CONFLICT` while the UI should display a non-blocking warning and retain optimistic state.
+- Attempting to edit or delete a soft-deleted todo returns `E_NOT_FOUND`; clients need to refresh the list and show "Todo not found" messaging.
+- Pagination cursors tampered in the URL return `E_VALIDATION`; UI clears the cursor and fetches the default page.
+- Cascading deletes must soft-delete dependent subtasks, tags, reminders, and recurrence instances in the same transaction to avoid orphaned rows.
 
 ## Acceptance Criteria
 

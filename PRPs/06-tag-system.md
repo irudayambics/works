@@ -192,13 +192,20 @@ db.prepare(`
 `).run({ ...payload, timestamp });
 ```
 
-### Client-Side Behavior
+## UI Components
+- **TagManagerPanel** displays skeletons, empty states, and error banners while managing tag CRUD operations.
+- **TagFormDialog** trims names, debounces uniqueness checks, and blocks duplicate submissions during pending states.
+- **TagMultiSelect** in todo editors offers keyboard-accessible search with optimistic chip updates and reconciliation on failures.
+- **TagFilterBar** syncs filter chips with URL params, resetting pagination when selections change and surfacing clear actions.
+- **TagChip** applies Tailwind color tokens, handles hover tooltips, and prevents arbitrary color injection by restricting palette choices.
+- **FeedbackToast / InlineError** components communicate validation, conflict, or forbidden errors per project tone.
 
-- Tag management panel renders skeletons, empty state, and error retry per design system.
-- Tag creation form trims input, debounces uniqueness checks, and prevents duplicate submissions while pending.
-- Todo editors expose searchable multi-select with keyboard navigation; optimistic updates adjust chips immediately and roll back on failure.
-- Filtering control syncs with URL query params and resets pagination when filters change.
-- Chips use Tailwind token classes derived from `color`; client enforces palette to prevent arbitrary injection.
+## Edge Cases
+- Creating a tag beyond the 200 active-tag limit returns `E_CONFLICT`; UI must block the action and surface limit messaging.
+- Name collisions ignoring case should return `E_CONFLICT`; clients normalize input and prompt for a different name.
+- Assigning tags that no longer exist (soft-deleted) must yield `E_NOT_FOUND`; UI refreshes available tags and removes stale chips.
+- Filter URLs referencing deleted tags should drop invalid IDs and show a non-blocking warning toast.
+- Concurrent updates to the same tag require conflict messaging and re-fetching the tag list to avoid stale color assignments.
 
 ## Acceptance Criteria
 
