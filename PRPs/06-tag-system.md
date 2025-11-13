@@ -177,17 +177,19 @@ Supports tag filtering alongside existing pagination.
 
 ### Timezone Handling
 
-**Critical:** All date operations use Singapore timezone (`Asia/Singapore`)
+**Critical:** All timestamp columns use the shared helpers from `00-core-prp.md` so created/updated metadata remain consistent when rendered in Singapore time.
 
 ```typescript
-import { getSingaporeNow, formatSingaporeDate } from '@/lib/timezone';
+import { nowSg, toUtcIso } from '@/lib/timezone';
 
-// When validating due date
-const nowSG = getSingaporeNow();  // NOT new Date()
-const dueDateObj = new Date(dueDate);
-if (dueDateObj <= nowSG) {
-  // Error: past date
-}
+const timestamp = toUtcIso(nowSg());
+db.prepare(`
+  UPDATE tags
+  SET name = @name,
+      color = @color,
+      updatedAt = @timestamp
+  WHERE id = @id
+`).run({ ...payload, timestamp });
 ```
 
 ### Client-Side Behavior

@@ -150,7 +150,7 @@ Reuse todo base endpoints and introduce recurrence-focused handlers. All respons
 
 **startAt/endAt**
 - Accept Singapore local date/time strings; convert via `parseSg` and persist using `toUtcIso`.
-- `startAt` must be >= current SG time minus 5 minutes tolerance; `endAt` must be null or after `startAt`.
+- `startAt` must be at least one minute ahead of the current SG time; `endAt` must be null or after `startAt`.
 - On update, ensure `endAt` not before last generated occurrence; else `E_CONFLICT` prompting user to complete or delete outstanding occurrences.
 
 **occurrenceId**
@@ -163,8 +163,8 @@ Reuse todo base endpoints and introduce recurrence-focused handlers. All respons
 import { nowSg, parseSg, toUtcIso, fromUtcIso } from '@/lib/timezone';
 
 const anchor = body.startAt ? parseSg(body.startAt) : toSg(todo.dueAt ?? nowSg());
-if (!anchor.isValid || anchor <= nowSg()) {
-  return err('E_VALIDATION', 'Start date must be in the future');
+if (!anchor.isValid || anchor <= nowSg().plus({ minutes: 1 })) {
+  return err('E_VALIDATION', 'Start date must be at least 1 minute in the future');
 }
 
 const nextOccurrence = computeNextOccurrence(rule, fromUtcIso(lastDueAt));
@@ -200,6 +200,7 @@ const dueAtUtc = toUtcIso(nextOccurrence);
 - [ ] Users can attach recurrence to a todo with valid combination of frequency, interval, and anchor date.
 - [ ] Backend prevents multiple active recurrence rules per todo.
 - [ ] System generates next occurrence immediately unless `endAt` reached.
+- [ ] Attempting to set a recurrence start date within the next minute returns `E_VALIDATION` and preserves existing data.
 
 ### Occurrence Management
 - [ ] Completing an occurrence marks it done and creates the next occurrence adhering to rule.
@@ -241,6 +242,7 @@ Test cases:
 - [ ] Create monthly recurrence on 31st using different strategies and verify due dates in shorter months.
 - [ ] Skip an occurrence and confirm the next scheduled date aligns with rule.
 - [ ] End recurrence and ensure no additional occurrences are generated afterward.
+- [ ] Attempt to start a recurrence within one minute and verify validation messaging without creating the rule.
 
 ## Performance Requirements
 - Recurrence creation (rule + first generation) completes ≤ 250 ms.

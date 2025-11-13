@@ -92,6 +92,10 @@ CREATE INDEX IF NOT EXISTS idx_dispatch_log_reminder
   ON reminder_dispatch_log(reminderId);
 ```
 
+### Configuration
+
+- Document `NOTIFICATIONS_POLL_INTERVAL_SECONDS` (default `30`) in `.env.example` and align client/server polling intervals with this value.
+
 ### API Endpoints
 
 #### `GET /api/reminder-preferences`
@@ -152,7 +156,7 @@ Validation:
 
 - Todo must exist and not be soft-deleted; otherwise `E_NOT_FOUND`.
 - Duplicate reminders per `(todoId, leadMinutes)` are rejected with `E_CONFLICT`.
-- Computed or provided fire time must be in the future or returns `E_VALIDATION`.
+- Computed or provided fire time must be in the future (no past-due reminders) or returns `E_VALIDATION`.
 
 #### `GET /api/reminders`
 
@@ -238,7 +242,7 @@ Validation:
   - Optional override; must use same enum as `defaultLeadMinutes`.
   - Friendly message: `"Reminder window is not supported."`
 - scheduledAt:
-  - Optional ISO timestamp; when provided it must be future-dated relative to `nowSg()`.
+  - Optional ISO timestamp; when provided it must not be in the past relative to `nowSg()`.
   - Friendly message: `"Scheduled time must be in the future."`
 
 ### Timezone Handling
@@ -249,12 +253,17 @@ Critical: All date operations use Singapore timezone (`Asia/Singapore`).
 import { nowSg, parseSg, toUtcIso, toSg } from '@/lib/timezone';
 
 const now = nowSg();
-const todoDue = todo.dueAt ? parseSg(todo.dueAt) : now.plus({ minutes: leadMinutes });
-if (!todoDue.isValid || todoDue <= now) {
+const dueDateSg = todo.dueAt ? parseSg(todo.dueAt) : now.plus({ minutes: leadMinutes });
+if (!dueDateSg.isValid || dueDateSg <= now.plus({ minutes: 1 })) {
+  return err('E_VALIDATION', 'Due date must be at least 1 minute in the future.');
+}
+
+const scheduledAtSg = dueDateSg.minus({ minutes: leadMinutes });
+if (scheduledAtSg <= now) {
   return err('E_VALIDATION', 'Scheduled time must be in the future.');
 }
 
-const scheduledAtUtc = toUtcIso(todoDue.minus({ minutes: leadMinutes }));
+const scheduledAtUtc = toUtcIso(scheduledAtSg);
 const scheduledAtLabel = toSg(scheduledAtUtc).toFormat('dd MMM yyyy, HH:mm');
 ```
 
@@ -290,6 +299,7 @@ const scheduledAtLabel = toSg(scheduledAtUtc).toFormat('dd MMM yyyy, HH:mm');
 - [ ] Scheduling a reminder inserts exactly one pending record per `(todoId, leadMinutes)` combination.
 - [ ] Reminders compute `scheduledAt` using SG timezone helpers and store UTC ISO values.
 - [ ] Cancelling or deleting a todo cascades to cancel its pending reminders.
+- [ ] Attempting to schedule a reminder for a todo due within the next minute returns `E_VALIDATION` and surfaces inline feedback.
 
 ### Reminder Dispatch
 
@@ -332,6 +342,7 @@ Test cases:
 - [ ] Cancel a reminder and confirm it no longer appears in the pending list.
 - [ ] Simulate concurrent tabs to ensure only one notification fires per reminder.
 - [ ] Verify history pagination returns distinct entries across cursor fetches.
+- [ ] Attempt to schedule a reminder for a todo due within one minute and assert validation messaging is shown with no reminder created.
 
 Unit and integration coverage:
 

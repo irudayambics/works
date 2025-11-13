@@ -75,6 +75,11 @@ CREATE INDEX IF NOT EXISTS idx_importJobs_user_status ON importJobs(userId, stat
 
 When import commits, affected base tables (`todos`, `todoTags`, `tags`, etc.) MUST continue to respect existing indices from dependent PRPs.
 
+### Configuration
+
+- Document `EXPORT_MAX_PER_HOUR` and `IMPORT_MAX_PER_HOUR` in `.env.example` with default value `3` each so rate limits stay transparent across environments.
+- Ensure `.env.example` also includes any storage paths used for export payloads (e.g., `EXPORT_STORAGE_DIR`) if non-default locations are required.
+
 ### API Endpoints
 All endpoints live under `app/api/export` and `app/api/import` folders and MUST return `ok`/`err` as defined in the core PRP.
 

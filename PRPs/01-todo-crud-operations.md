@@ -78,7 +78,7 @@ All endpoints reside under `app/api/todos` and MUST use the shared response enve
 - Validation:
   - `title` required, trim, length 1-200 (`E_VALIDATION`).
   - `priority` must be enum value; defaults to `'medium'` if omitted (`E_VALIDATION`).
-  - `dueAt` (if provided) must parse to valid future Singapore date via timezone helpers (`E_VALIDATION`).
+  - `dueAt` (if provided) must parse to valid Singapore date at least **one minute** in the future via timezone helpers (`E_VALIDATION`).
   - Reject duplicate `Idempotency-Key` with `E_CONFLICT`.
 
 #### `GET /api/todos`
@@ -146,8 +146,8 @@ All endpoints reside under `app/api/todos` and MUST use the shared response enve
 
 **dueAt**
 - Optional UTC ISO string.
-- When provided, convert from Singapore-local input via timezone helpers and ensure future or same-day completion window.
-- Error: "Due date must be in the future" (`E_VALIDATION`).
+- When provided, convert from Singapore-local input via timezone helpers and ensure it is at least one minute later than `nowSg()` (Singapore time).
+- Error: "Due date must be at least 1 minute in the future" (`E_VALIDATION`).
 
 **completed**
 - Optional boolean; `true` sets `completed = 1`, `false` sets `0`.
@@ -165,8 +165,8 @@ const dueDateSg = body.dueAt ? parseSg(body.dueAt) : null;
 if (dueDateSg && !dueDateSg.isValid) {
   return err('E_VALIDATION', 'Invalid due date');
 }
-if (dueDateSg && dueDateSg <= now) {
-  return err('E_VALIDATION', 'Due date must be in the future');
+if (dueDateSg && dueDateSg <= now.plus({ minutes: 1 })) {
+  return err('E_VALIDATION', 'Due date must be at least 1 minute in the future');
 }
 const dueAtUtc = dueDateSg ? toUtcIso(dueDateSg) : null;
 ```
@@ -191,6 +191,7 @@ const dueAtUtc = dueDateSg ? toUtcIso(dueDateSg) : null;
 - UI confirmation modal prevents accidental deletes; undo button triggers refetch.
 - State removes todo immediately while awaiting server confirmation.
 - API delete considered idempotent; undo (restore) deferred to future PRP.
+- Delete handler MUST cascade within the same transaction to dependent resources introduced by other features (subtasks, tags, reminders, recurrence instances) by soft-deleting their rows so acceptance criteria in later PRPs stay satisfied.
 
 ## Acceptance Criteria
 
@@ -208,6 +209,7 @@ const dueAtUtc = dueDateSg ? toUtcIso(dueDateSg) : null;
 - [ ] PATCH updates only provided fields and refreshes `updatedAt`.
 - [ ] Completed flag toggles between 0/1 and UI reflects state immediately.
 - [ ] Validation errors bubble to user with friendly messaging.
+- [ ] Reject due dates less than one minute ahead (server response `E_VALIDATION`).
 
 ### Delete Todo
 - [ ] DELETE sets `deletedAt` and returns success in core envelope.
@@ -238,6 +240,7 @@ Test cases:
 - [ ] Validation failure on empty title shows inline message without creating record.
 - [ ] Update todo title and mark completed; confirm persistence after reload.
 - [ ] Delete todo and ensure it no longer appears; deleting twice stays idempotent.
+- [ ] Attempt to create todo with due date less than one minute ahead shows validation error inline and no record is persisted.
 - [ ] Pagination smoke: seed >50 todos and verify cursor fetch loads next page.
 
 ## Performance Requirements

@@ -45,7 +45,12 @@ A single source of truth that all feature PRPs must follow. Keep this short, pre
 
 * SQLite file path: `DATA_DB_PATH` (default: `./data/app.db`).
 * JWT secret: `AUTH_JWT_SECRET`.
-* WebAuthn RP ID/Origin: `AUTH_RP_ID`, `AUTH_RP_ORIGIN`.
+* WebAuthn RP ID/Origin/Name: `AUTH_RP_ID`, `AUTH_RP_ORIGIN`, `AUTH_RP_NAME`.
+* Cookie configuration: `AUTH_COOKIE_DOMAIN`, `AUTH_COOKIE_SECURE` (optional overrides for production hardening).
+* Reminder polling: `NOTIFICATIONS_POLL_INTERVAL_SECONDS` (default 30).
+* Export/import quotas: `EXPORT_MAX_PER_HOUR`, `IMPORT_MAX_PER_HOUR` (defaults 3 each).
+
+Maintain `.env.example` in the repo root with every required variable, sensible defaults (non-secret), and short inline documentation. Any new feature PRP adding variables MUST update `.env.example` and note production overrides in the relevant section.
 
 ---
 
@@ -96,6 +101,7 @@ export function fromUtcIso(iso: string): DateTime {
 
 * **All** due date math (recurrence, reminders) MUST use these helpers.
 * Sorts and filters by date MUST compute with SG zone then persist/compare in UTC.
+* When validating user-supplied due dates, enforce `parseSg(input) > nowSg().plus({ minutes: 1 })` to guarantee at least a one-minute future buffer per evaluation checklist.
 
 ---
 
@@ -151,6 +157,11 @@ export function createId(): string {
   return crypto.randomUUID(); // Node 18+
 }
 ```
+
+**Cascade expectations**
+
+* Todo deletions MUST cascade in the same transaction to dependent tables (`subtasks`, `todoTags`, `reminders`, recurrence instances) using explicit SQL updates setting `deletedAt` and maintaining referential integrity.
+* Foreign-key constraints MAY remain deferrable, but every API that deletes or restores a todo is responsible for downstream clean-up to satisfy acceptance criteria (e.g., delete cascades to subtasks and tags).
 
 ---
 
@@ -291,22 +302,49 @@ export function validate<T extends Record<string, unknown>>(input: any, schema: 
 * Timezone-sensitive scenarios: due‑today (SG), crossing midnight SG.
 * Auth flow (once implemented): register, login, protected route access.
 * Accessibility smoke: tab traversal to key controls.
+* Dedicated spec per feature PRP stored under `tests/` (e.g., `tests/01-todo-crud-operations.spec.ts` → `tests/11-authentication-webauthn.spec.ts`) plus shared helpers in `tests/helpers.ts`.
+* Configure Playwright to use the Singapore timezone (`timezone: 'Asia/Singapore'`) and virtual WebAuthn authenticators for Feature 11 specs.
+* Maintain three consecutive green runs in CI before a feature is marked `Verified` in evaluation tracking.
 
 **Unit tests SHOULD cover:**
 
 * Time utilities (`lib/timezone.ts`) edge cases.
 * Validation (`lib/validate.ts`) positive/negative cases.
 * API handlers: validation failure, not found, success.
+* Progress, ID remapping, and date-math helpers introduced by feature PRPs (subtask progress, export/import remapping, recurrence calculators, reminder lead-time math).
 
 **Fixtures:** Reuse a clean DB per test run (create a temp SQLite file in `tmp/`).
+Provide seeds for 1) baseline todos (mix of priorities/tags), 2) SG holidays, and 3) authentication mocks. Clean up generated files post-test to keep CI idempotent.
 
 ---
 
-## 11) Performance & Accessibility Budgets
+## 11) Performance, Accessibility & Browser Budgets
 
-* First meaningful interaction < 1.5s on mid-tier laptop.
-* List views paginate at 50 rows by default; avoid rendering >200 items at once.
-* Lighthouse a11y score ≥ 90 on key pages.
+**Frontend**
+- First contentful paint < 1 s, time to interactive < 3 s, total page load < 2 s on mid-tier hardware.
+- Todo mutations, reminder scheduling, and template instantiation resolve < 500 ms end-to-end; search/filter updates respond < 100 ms.
+- Virtualize or paginate when rendering > 100 todos; default list page size 50 items.
+- Bundle (gzipped) stays < 500 KB per route; lazy-load non-critical components (calendar, template gallery, reminder drawers).
+
+**Backend**
+- Average API response < 300 ms; 95th percentile < 500 ms for heavy endpoints (calendar, export preview).
+- Use prepared statements everywhere; avoid N+1 queries by pre-joining tags/subtasks when feasible.
+- Implement indexes on foreign keys, `dueAt`, and high-cardinality filters (`priority`, `completed` per evaluation checklist).
+
+**Database**
+- Keep SQLite file size < 100 MB for 10k todos; vacuum during maintenance if exceeded.
+- Enforce WAL mode and short transactions; long-running jobs (export/import) stream results to avoid locking.
+- Maintain covering indexes defined by feature PRPs (tags, subtasks, reminders) and audit them quarterly.
+
+**Accessibility**
+- Achieve Lighthouse accessibility score ≥ 90 on key routes (`/`, `/calendar`, `/login`).
+- Ensure WCAG AA color contrast, visible focus rings, ARIA labels for interactive elements, and keyboard navigability for modals, lists, and drag/drop alternatives.
+- Provide screen-reader announcements for optimistic mutations (todo created, reminder scheduled) via polite live regions.
+
+**Browser & Device Support**
+- Verify core flows in latest Chrome/Edge (Chromium), Firefox, Safari (desktop), and Chrome/Safari (mobile).
+- Validate WebAuthn on supported browsers (including virtual authenticator in CI) and gracefully degrade when unavailable.
+- Ensure responsive layouts for breakpoints ≥320 px; calendar view switches to agenda summary on narrow widths.
 
 ---
 
@@ -353,7 +391,9 @@ Playwright scenarios + unit tests (time matrix when applicable).
 Explicitly excluded features.
 
 ## Success Metrics
-Adoption/latency/error-rate targets.
+- Adoption/latency/error-rate targets.
+- Document latest unit/E2E test run identifiers (CI job URL or timestamp) when marking features complete.
+- Capture accessibility (Lighthouse) and performance audit results in the associated PRP or release checklist entry.
 ```
 
 ---
@@ -385,3 +425,4 @@ Adoption/latency/error-rate targets.
 ## 17) Changelog (brief)
 
 * **2025-11-12:** Initial version created.
+* **2025-11-13:** Added environment catalog, cascade expectations, expanded testing/performance budgets, and documentation guidance per evaluation checklist.

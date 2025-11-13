@@ -123,54 +123,22 @@ Updates template metadata.
 Soft deletes a template.
 
 - Input: path `id`.
-- Output: `ok({ id: string })`.
-- Validation: nonexistent templates return `E_NOT_FOUND`; already deleted templates respond idempotently with success.
-
-#### `POST /api/templates/:id/instantiate`
-
-Creates a todo from the template.
-
-- Input:
-
-  ```typescript
-  {
-    targetDate?: string; // ISO string in SG timezone
-    overrideDueOffsetMinutes?: number;
-    reminderLeadMinutes?: number;
-  }
-  ```
-
-- Output: `ok<{ todoId: string }>` with the created todo snapshot in `data.todo`.
-- Validation:
-  - Template must exist and not be soft deleted.
-  - `targetDate` optional ISO; defaults to now in SG timezone.
-  - `overrideDueOffsetMinutes` must be within the same bounds as `dueOffsetMinutes`.
-  - Reminder optional; if omitted, template value is used; if both absent, no reminder scheduled.
-  - Operation runs in a transaction to insert todo, subtasks, tags, and reminder job.
-
-### Validation Rules
-
-- **name**: Required on create; unique per user; trims whitespace. Message: "Template name must be unique and between 1 and 60 characters."
-- **category**: Required; trimmed 1–40 characters. Message: "Provide a template category between 1 and 40 characters."
-- **subtasks**: Array length 0–50; titles 1–200 chars; contiguous positions. Message: "Each subtask needs a title and sequential position."
-- **tagIds**: Array length 0–10; IDs must exist for the user. Message: "Templates can include up to 10 valid tags."
-- **dueOffsetMinutes**: Optional integer between -43200 and 43200. Message: "Due offset must be within ±30 days."
-- **reminderLeadMinutes**: Optional; must match allowed lead times. Message: "Choose a supported reminder lead time."
-- **targetDate**: Optional ISO string; when present must parse in SG timezone. Message: "Target date is invalid."
-
+### Timezone Handling
 ### Timezone Handling
 
-**Critical:** All date operations use Singapore timezone (`Asia/Singapore`)
+**Critical:** All date operations use Singapore timezone (`Asia/Singapore`). Template due date offsets must convert through the shared helpers so instantiated todos align with SG expectations.
 
 ```typescript
-import { getSingaporeNow, formatSingaporeDate } from '@/lib/timezone';
+import { nowSg, parseSg, toUtcIso } from '@/lib/timezone';
 
-// When validating due date
-const nowSG = getSingaporeNow();  // NOT new Date()
-const dueDateObj = new Date(dueDate);
-if (dueDateObj <= nowSG) {
-  // Error: past date
+const target = body.targetDate ? parseSg(body.targetDate) : nowSg();
+if (!target.isValid) {
+  return err('E_VALIDATION', 'Target date is invalid');
 }
+
+const dueAt = template.dueOffsetMinutes != null
+  ? toUtcIso(target.plus({ minutes: template.dueOffsetMinutes }))
+  : null;
 ```
 
 ### Client-Side Behavior
@@ -213,11 +181,8 @@ if (dueDateObj <= nowSG) {
 
 - Transactions that fail during instantiation roll back all inserts and return `E_INTERNAL`; client shows retry CTA.
 - Unauthorized access returns `E_UNAUTHORIZED` and redirects to login.
-- Rate limiting returns `E_RATE_LIMIT`; UI backs off and surfaces "Too many template actions. Try again soon." message.
 
 ## Testing Requirements
-
-### E2E Tests (Playwright)
 
 ```text
 tests/07-template-system.spec.ts

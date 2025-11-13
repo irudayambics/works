@@ -153,17 +153,24 @@ Soft deletes a subtask and compacts ordering.
 - **position**: Required integer ≥0; contiguous across the reorder payload. Error: "Positions must be sequential starting from zero."
 
 ### Timezone Handling
-**Critical:** All date operations use Singapore timezone (`Asia/Singapore`)
+**Critical:** All date operations use Singapore timezone (`Asia/Singapore`). When stamping completion times, rely on the shared helpers from `00-core-prp.md`.
 
 ```typescript
-import { getSingaporeNow, formatSingaporeDate } from '@/lib/timezone';
+import { nowSg, toUtcIso } from '@/lib/timezone';
 
-// When validating due date
-const nowSG = getSingaporeNow();  // NOT new Date()
-const dueDateObj = new Date(dueDate);
-if (dueDateObj <= nowSG) {
-  // Error: past date
-}
+const completedAtUtc = body.isCompleted ? toUtcIso(nowSg()) : null;
+db.prepare(
+  `UPDATE subtasks
+   SET isCompleted = @isCompleted,
+       completedAt = @completedAt,
+       updatedAt = @updatedAt
+   WHERE id = @id`
+).run({
+  id,
+  isCompleted: body.isCompleted ? 1 : 0,
+  completedAt: completedAtUtc,
+  updatedAt: toUtcIso(nowSg()),
+});
 ```
 
 ### Client-Side Behavior
