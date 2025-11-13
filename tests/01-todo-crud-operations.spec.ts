@@ -8,10 +8,7 @@ test.beforeAll(async ({ request }) => {
   const meResponse = await request.get('/api/auth/me', {
     headers: authHeaders(session),
   });
-  if (meResponse.status() !== 200) {
-    const body = await meResponse.text();
-    throw new Error(`Failed to bootstrap authenticated session: ${meResponse.status()} ${body}`);
-  }
+  expect(meResponse.status(), 'bootstrap /api/auth/me should authenticate').toBe(200);
 });
 
 test.describe('Todo CRUD API', () => {

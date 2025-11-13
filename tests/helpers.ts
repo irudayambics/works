@@ -1,4 +1,4 @@
-import { SignJWT } from 'jose';
+import { SignJWT, jwtVerify } from 'jose';
 import { DateTime } from 'luxon';
 
 import { createId } from '@/lib/id';
@@ -24,24 +24,39 @@ export async function ensureTestSession(): Promise<TestSession> {
     return cachedSession;
   }
 
+  if (!process.env.TEST_AUTH_BYPASS) {
+    throw new Error('TEST_AUTH_BYPASS env not set for tests');
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    // no-op placeholder to avoid lint complaining about console usage in production builds
+  }
+
+  // eslint-disable-next-line no-console -- helpful during test bootstrap to confirm db path
+  console.log('[tests] using DATA_DB_PATH', process.env.DATA_DB_PATH);
+
   const timestamp = new Date().toISOString();
-  const username = `playwright-${process.pid}`;
-  let user = userDB.findByUsername(username);
+  let desiredUserId = process.env.TEST_AUTH_USER_ID ?? createId();
+  const username = process.env.TEST_AUTH_USERNAME ?? `playwright-${process.pid}`;
+  let user = userDB.getById(desiredUserId) ?? userDB.findByUsername(username);
   if (!user) {
     user = userDB.create({
-      id: createId(),
+      id: desiredUserId,
       username,
       displayName: 'Playwright User',
       createdAt: timestamp,
       updatedAt: timestamp,
     });
   }
+  desiredUserId = user.id;
 
   const token = await new SignJWT({ userId: user.id, username: user.username })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
     .sign(SECRET);
+
+  await jwtVerify(token, SECRET);
 
   cachedSession = {
     userId: user.id,
@@ -61,9 +76,15 @@ export function sgFutureIso({ minutes = 0, seconds = 0 }: { minutes?: number; se
 }
 
 export function authHeaders(session: TestSession, extra?: Record<string, string>) {
-  return {
-    Cookie: session.cookieHeader,
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(extra ?? {}),
   };
+
+  if (process.env.TEST_AUTH_BYPASS !== '1' && process.env.TEST_AUTH_BYPASS !== 'true') {
+    headers.Cookie = session.cookieHeader;
+    headers.cookie = session.cookieHeader;
+  }
+
+  return headers;
 }

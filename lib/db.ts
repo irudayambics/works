@@ -6,6 +6,10 @@ import { DateTime } from 'luxon';
 import { fromUtcIso, SG_TZ } from './timezone';
 
 const dbPath = process.env.DATA_DB_PATH ?? path.resolve(process.cwd(), 'todos.db');
+if (process.env.LOG_DB_PATH === '1') {
+  // eslint-disable-next-line no-console -- surfaced only during targeted diagnostics
+  console.log('[db] using DATA_DB_PATH', dbPath);
+}
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 export const db = new Database(dbPath);

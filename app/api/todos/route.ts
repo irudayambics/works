@@ -291,11 +291,10 @@ export async function POST(request: NextRequest) {
 
   const subtasks = parsed.data.subtasks ?? [];
   if (subtasks.length > 0) {
-    const stmt = subtaskDB.create;
     subtasks
       .sort((a, b) => a.position - b.position)
       .forEach((item, index) => {
-        stmt({
+        subtaskDB.create({
           id: createId(),
           todoId,
           title: item.title.trim(),

@@ -281,11 +281,6 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   }
 
   const { id } = await context.params;
-  const existing = await ensureSessionTodo(session.userId, id);
-  if (!existing) {
-    return NextResponse.json(err('E_NOT_FOUND', 'Todo not found'), { status: 404 });
-  }
-
   const deleted = todoDB.softDelete(id, session.userId, toUtcIso(nowSg()));
   if (deleted) {
     return NextResponse.json(ok({ success: true }));
