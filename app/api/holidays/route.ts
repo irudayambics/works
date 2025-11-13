@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { todoDB } from '@/lib/db';
-import { ok, err } from '@/lib/http';
 import { getSession } from '@/lib/auth';
+import { err, ok } from '@/lib/http';
+import { holidayDB } from '@/lib/db';
 
 export async function GET() {
   const session = await getSession();
@@ -10,6 +10,6 @@ export async function GET() {
     return NextResponse.json(err('E_UNAUTHENTICATED', 'Not authenticated'), { status: 401 });
   }
 
-  const summary = todoDB.summary(session.userId);
-  return NextResponse.json(ok(summary));
+  const holidays = holidayDB.list();
+  return NextResponse.json(ok(holidays));
 }
