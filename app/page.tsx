@@ -1,9 +1,11 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DateTime } from 'luxon';
 import clsx from 'clsx';
 
-import { formatSingaporeDate, fromUtcIso, nowSg, toUtcIso } from '@/lib/timezone';
+import { createId } from '@/lib/id';
+import { formatSingaporeDate, fromUtcIso, nowSg, parseSg, toUtcIso, SG_TZ } from '@/lib/timezone';
 
 type Priority = 'high' | 'medium' | 'low';
 
@@ -60,14 +62,18 @@ function useToast() {
     return () => window.clearTimeout(id);
   }, [toast]);
 
+  const showToast = useCallback((message: string, tone: ToastTone) => {
+    setToast({ message, tone });
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setToast(null);
+  }, []);
+
   return {
     toast,
-  showToast(message: string, tone: ToastTone) {
-      setToast({ message, tone });
-    },
-    dismiss() {
-      setToast(null);
-    },
+    showToast,
+    dismiss,
   } as const;
 }
 
@@ -87,6 +93,24 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit) {
   const response = await fetch(input, init);
   const json = (await response.json()) as ApiResponse<T>;
   return { status: response.status, body: json } as const;
+}
+
+function normalizeDueAtInput(value: string): { formatted: string; sgDate: DateTime } | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const local = DateTime.fromISO(trimmed);
+  if (!local.isValid) {
+    return null;
+  }
+
+  const sgDate = local.setZone(SG_TZ);
+  return {
+    sgDate,
+    formatted: sgDate.toFormat("yyyy-LL-dd'T'HH:mm"),
+  };
 }
 
 export default function TodosPage() {
@@ -139,46 +163,59 @@ export default function TodosPage() {
     [includeCompleted, priorityFilter]
   );
 
+  const isFetchingRef = useRef(false);
+
   const loadTodos = useCallback(
-    async ({ reset }: { reset: boolean }) => {
-      if (isLoading || isLoadingMore) return;
+    async ({ reset, cursor: cursorOverride }: { reset: boolean; cursor?: string | null }) => {
+      if (isFetchingRef.current) {
+        return;
+      }
+
+      isFetchingRef.current = true;
       setError(null);
+
       if (reset) {
         setIsLoading(true);
+        setCursor(null);
       } else {
         setIsLoadingMore(true);
       }
 
-      const qs = buildQuery(reset ? null : cursor);
-      const { status, body } = await fetchJson<
-        Todo[]
-      >(`/api/todos?${qs}`);
+      const cursorToUse = reset ? null : cursorOverride ?? null;
 
-      if (!body.ok) {
-        setError(body.error.message || 'Failed to load todos');
-        showToast(body.error.message || 'Failed to load todos', 'error');
-        setIsLoading(false);
-        setIsLoadingMore(false);
-        return;
+      try {
+        const qs = buildQuery(cursorToUse);
+        const { body } = await fetchJson<Todo[]>(`/api/todos?${qs}`);
+
+        if (!body.ok) {
+          const message = body.error.message || 'Failed to load todos';
+          setError(message);
+          showToast(message, 'error');
+          return;
+        }
+
+        const nextCursor = (body.meta?.cursor as string | undefined) ?? null;
+        setCursor(nextCursor);
+
+        if (reset) {
+          setTodos(body.data);
+        } else {
+          setTodos((prev: Todo[]) => [...prev, ...body.data]);
+        }
+      } finally {
+        if (reset) {
+          setIsLoading(false);
+        } else {
+          setIsLoadingMore(false);
+        }
+        isFetchingRef.current = false;
       }
-
-      const nextCursor = (body.meta?.cursor as string | undefined) ?? null;
-      setCursor(nextCursor);
-
-      if (reset) {
-        setTodos(body.data);
-      } else {
-  setTodos((prev: Todo[]) => [...prev, ...body.data]);
-      }
-
-      setIsLoading(false);
-      setIsLoadingMore(false);
     },
-    [buildQuery, cursor, isLoading, isLoadingMore, showToast]
+    [buildQuery, showToast]
   );
 
   useEffect(() => {
-    loadTodos({ reset: true });
+    loadTodos({ reset: true, cursor: null });
     loadSummary();
   }, [includeCompleted, priorityFilter, loadTodos, loadSummary]);
 
@@ -190,13 +227,27 @@ export default function TodosPage() {
         return;
       }
 
-      const idempotencyKey = crypto.randomUUID();
+      let dueAtSingapore: { formatted: string; sgDate: DateTime } | null = null;
+      if (formState.dueAt) {
+        const normalized = normalizeDueAtInput(formState.dueAt);
+        if (!normalized) {
+          showToast('Please enter a valid due date', 'error');
+          return;
+        }
+        if (normalized.sgDate <= nowSg().plus({ minutes: 1 })) {
+          showToast('Due date must be at least 1 minute in the future', 'error');
+          return;
+        }
+        dueAtSingapore = normalized;
+      }
+
+      const idempotencyKey = createId();
       const optimisticTodo: Todo = {
         id: idempotencyKey,
         title: formState.title.trim(),
         description: formState.description.trim().length > 0 ? formState.description.trim() : null,
         priority: formState.priority,
-        dueAt: formState.dueAt || null,
+        dueAt: dueAtSingapore ? toUtcIso(dueAtSingapore.sgDate) : null,
         completed: false,
         createdAt: toUtcIso(nowSg()),
         updatedAt: toUtcIso(nowSg()),
@@ -209,11 +260,11 @@ export default function TodosPage() {
         title: formState.title.trim(),
         description: formState.description.trim().length > 0 ? formState.description.trim() : undefined,
         priority: formState.priority,
-        dueAt: formState.dueAt || undefined,
+        dueAt: dueAtSingapore?.formatted ?? undefined,
       };
 
       const { status, body } = await fetchJson<Todo>('/api/todos', {
-        method: 'POST',
+          method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
@@ -230,7 +281,7 @@ export default function TodosPage() {
       setFormState({ title: '', description: '', priority: 'medium', dueAt: '' });
       showToast('Todo created', 'success');
       await loadSummary();
-      await loadTodos({ reset: true });
+      await loadTodos({ reset: true, cursor: null });
     },
     [formState, loadSummary, loadTodos, showToast]
   );
@@ -240,15 +291,46 @@ export default function TodosPage() {
   const optimisticPrev = todos.find((todo: Todo) => todo.id === id);
       if (!optimisticPrev) return;
 
+      let dueAtPayload: string | null | undefined = undefined;
+      let dueAtUtc: string | null | undefined = undefined;
+
+      if (updates.dueAt !== undefined) {
+        if (updates.dueAt === null) {
+          dueAtPayload = null;
+          dueAtUtc = null;
+        } else if (typeof updates.dueAt === 'string' && updates.dueAt.length > 0) {
+          const parsedDue = parseSg(updates.dueAt);
+          if (!parsedDue.isValid) {
+            showToast('Please enter a valid due date', 'error');
+            return;
+          }
+          if (parsedDue <= nowSg().plus({ minutes: 1 })) {
+            showToast('Due date must be at least 1 minute in the future', 'error');
+            return;
+          }
+          dueAtPayload = updates.dueAt;
+          dueAtUtc = toUtcIso(parsedDue);
+        }
+      }
+
       setTodos((prev: Todo[]) =>
-        prev.map((todo: Todo) => (todo.id === id ? { ...todo, ...updates, optimistic: true } : todo))
+        prev.map((todo: Todo) =>
+          todo.id === id
+            ? {
+                ...todo,
+                ...updates,
+                ...(dueAtUtc !== undefined ? { dueAt: dueAtUtc } : {}),
+                optimistic: true,
+              }
+            : todo
+        )
       );
 
       const payload: Record<string, unknown> = {};
       if (updates.title !== undefined) payload.title = updates.title;
       if (updates.description !== undefined) payload.description = updates.description;
       if (updates.priority !== undefined) payload.priority = updates.priority;
-      if (updates.dueAt !== undefined) payload.dueAt = updates.dueAt;
+      if (dueAtPayload !== undefined) payload.dueAt = dueAtPayload;
       if (updates.completed !== undefined) payload.completed = updates.completed;
 
       const { body } = await fetchJson<Todo>(`/api/todos/${id}`, {
@@ -267,7 +349,7 @@ export default function TodosPage() {
 
       showToast('Todo updated', 'success');
       await loadSummary();
-      await loadTodos({ reset: true });
+      await loadTodos({ reset: true, cursor: null });
     },
     [todos, loadSummary, loadTodos, showToast]
   );
@@ -288,7 +370,7 @@ export default function TodosPage() {
 
       showToast('Todo deleted', 'info');
       await loadSummary();
-      await loadTodos({ reset: true });
+      await loadTodos({ reset: true, cursor: null });
     },
     [todos, loadSummary, loadTodos, showToast]
   );
@@ -525,7 +607,7 @@ export default function TodosPage() {
                       const title = String(formData.get('edit-title') ?? '').trim();
                       const description = String(formData.get('edit-description') ?? '').trim();
                       const priority = formData.get('edit-priority') as Priority;
-                      const dueAt = String(formData.get('edit-dueAt') ?? '');
+                      const dueAtInput = String(formData.get('edit-dueAt') ?? '').trim();
                       const completed = formData.get('edit-completed') === 'on';
 
                       const updates: Partial<Todo> = {};
@@ -534,8 +616,18 @@ export default function TodosPage() {
                         updates.description = description.length > 0 ? description : null;
                       }
                       if (priority !== todo.priority) updates.priority = priority;
-                      if (dueAt !== toFormDateTime(todo.dueAt)) {
-                        updates.dueAt = dueAt.length > 0 ? dueAt : null;
+                      const currentDueAt = toFormDateTime(todo.dueAt);
+                      if (dueAtInput.length > 0) {
+                        const normalized = normalizeDueAtInput(dueAtInput);
+                        if (!normalized) {
+                          showToast('Please enter a valid due date', 'error');
+                          return;
+                        }
+                        if (normalized.formatted !== currentDueAt) {
+                          updates.dueAt = normalized.formatted;
+                        }
+                      } else if (currentDueAt) {
+                        updates.dueAt = null;
                       }
                       if (completed !== todo.completed) updates.completed = completed;
 
@@ -641,7 +733,7 @@ export default function TodosPage() {
           <div className="mt-6 flex justify-center">
             <button
               type="button"
-              onClick={() => loadTodos({ reset: false })}
+              onClick={() => loadTodos({ reset: false, cursor })}
               disabled={isLoadingMore}
               className="rounded-md border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:border-slate-600 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
