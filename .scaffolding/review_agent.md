@@ -1,2 +1,0 @@
-Please read the `README.md` given carefully without executing, pay attention to PRP Structure section, Related Documentation section, Technical Stack Reference Section, Tips for AI Assistants section, and Contributing sections.
-Then, review and update the PRP files by strictly following the relevant instructions in `README.md` given.

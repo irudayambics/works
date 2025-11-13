@@ -1,9 +1,0 @@
-node_modules
-.next
-out
-*.log
-.env.local
-data/
-todos.db
-playwright-report
-test-results/playwright*.db*
