@@ -6,3 +6,4 @@ out
 data/
 todos.db
 playwright-report
+test-results/playwright*.db*
