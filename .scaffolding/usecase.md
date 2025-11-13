@@ -29,3 +29,6 @@ Please review and update the PRP files given following the requirements in archi
 - You must reference the `README.md` file, and then the `PRPs` folder for implementing the full application.
 - Answer "Please proceed" if needed in the chat.
 - Choose "Allow" if permission is needed to create files in the chat.
+
+# Final Checks
+Please perform the final checks as per `final_checks.md`.
