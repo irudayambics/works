@@ -16,7 +16,7 @@ COPY . .
 
 # Build Next.js app
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_RP_ID=ai-sdlc-workshop-day1-production.up.railway.app
+ENV NEXT_PUBLIC_RP_ID=works-production.up.railway.app
 RUN npm run build
 
 # Create todos.db file with correct permissions
@@ -26,6 +26,6 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-ENV NEXT_PUBLIC_RP_ID=ai-sdlc-workshop-day1-production.up.railway.app
+ENV NEXT_PUBLIC_RP_ID=works-production.up.railway.app
 
 CMD ["npm", "start"]
