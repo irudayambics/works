@@ -1,0 +1,3 @@
+Please read the `README.md` given carefully without executing, pay attention to the Related Documentation section, Development Workflow Section, Implementation Priority Section, Technical Stack Reference Section and Tips for AI Assistants sections.
+Then, implement the full application by strictly following the relevant instructions in `README.md` given and referencing the PRP files in the `PRPs` folder.
+The implemented application shall be under the `app` folder.
